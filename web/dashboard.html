@@ -417,14 +417,48 @@
         return `${protocol}//${hostname}${port ? ':' + port : ''}`;
       }
 
-      // 获取 WebSocket 地址
-      function getWsUrl() {
-        const protocol = window.location.protocol;
-        const hostname = window.location.hostname;
-        const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
-        // 假设 WebSocket 端口为 7777
-        return `${wsProtocol}//${hostname}:7777`;
-      }
+      // 获取 WebSocket 地址 (使用闭包缓存配置)
+      const getWsUrl = (function() {
+        let cachedWsUrl = null;
+        let configPromise = null;
+
+        return async function() {
+          // 如果已经有缓存的 URL，直接返回
+          if (cachedWsUrl) {
+            return cachedWsUrl;
+          }
+
+          // 如果正在请求配置，复用同一个 Promise
+          if (!configPromise) {
+            configPromise = (async () => {
+              const apiUrl = getApiUrl();
+              const hostname = window.location.hostname;
+
+              try {
+                const response = await fetch(`${apiUrl}/api/v1/config/websocket`, {
+                  headers: getHeaders(),
+                });
+
+                if (response.ok) {
+                  const result = await response.json();
+                  const wsPort = result.data.ws_port;
+                  cachedWsUrl = `ws://${hostname}:${wsPort}`;
+                } else {
+                  console.warn("获取 WebSocket 配置失败，使用默认端口 7777");
+                  cachedWsUrl = `ws://${hostname}:7777`;
+                }
+              } catch (error) {
+                console.warn("获取 WebSocket 配置失败，使用默认端口 7777", error);
+                cachedWsUrl = `ws://${hostname}:7777`;
+              }
+
+              return cachedWsUrl;
+            })();
+          }
+
+          return configPromise;
+        };
+      })();
 
       // 显示提示消息
       function showAlert(message, type = "info") {
@@ -534,7 +568,7 @@
       // 刷新服务列表
       async function refreshServices() {
         const apiUrl = getApiUrl();
-        const wsUrl = getWsUrl();
+        const wsUrl = await getWsUrl();
         const servicesList = document.getElementById("servicesList");
 
         try {

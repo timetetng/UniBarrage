@@ -23,7 +23,18 @@ import (
 	"time"
 )
 
-func StartServer(host string, port int, certFile string, keyFile string, expectedToken string, allowedOrigins []string) {
+// WebSocket configuration
+var (
+	wsHost   string
+	wsPort   int
+	certFile string
+)
+
+func StartServer(host string, port int, cert string, keyFile string, expectedToken string, allowedOrigins []string, websocketHost string, websocketPort int) {
+	// Store WebSocket configuration
+	wsHost = websocketHost
+	wsPort = websocketPort
+	certFile = cert
 	r := chi.NewRouter()
 
 	// 中间件
@@ -52,6 +63,8 @@ func StartServer(host string, port int, certFile string, keyFile string, expecte
 		}
 		// 欢迎信息
 		r.Get("/", Hello)
+		// 获取 WebSocket 配置
+		r.Get("/config/websocket", GetWebSocketConfig)
 		// 获取所有服务状态
 		r.Get("/all", ListAllServices)
 		// 获取指定平台的所有服务
@@ -412,6 +425,15 @@ func StopService(w http.ResponseWriter, r *http.Request) {
 
 func Hello(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, "Hello, UniBarrage!", nil)
+}
+
+// GetWebSocketConfig 获取 WebSocket 配置信息
+func GetWebSocketConfig(w http.ResponseWriter, r *http.Request) {
+	config := map[string]interface{}{
+		"ws_port": wsPort,
+	}
+
+	jsonResponse(w, http.StatusOK, "获取成功", config)
 }
 
 func ListAllServices(w http.ResponseWriter, r *http.Request) {

@@ -100,6 +100,8 @@ func main() {
 				c.String("keyFile"),
 				c.String("authToken"),
 				origins,
+				c.String("wsHost"),
+				c.Int("wsPort"),
 			)
 
 			// 启动 WebSocket 服务器
