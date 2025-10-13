@@ -24,17 +24,11 @@ import (
 )
 
 // WebSocket configuration
-var (
-	wsHost   string
-	wsPort   int
-	certFile string
-)
+var wsPort int
 
-func StartServer(host string, port int, cert string, keyFile string, expectedToken string, allowedOrigins []string, websocketHost string, websocketPort int) {
-	// Store WebSocket configuration
-	wsHost = websocketHost
+func StartServer(host string, port int, certFile string, keyFile string, expectedToken string, allowedOrigins []string, websocketPort int) {
+	// Store WebSocket port
 	wsPort = websocketPort
-	certFile = cert
 	r := chi.NewRouter()
 
 	// 中间件

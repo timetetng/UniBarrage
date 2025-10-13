@@ -100,7 +100,6 @@ func main() {
 				c.String("keyFile"),
 				c.String("authToken"),
 				origins,
-				c.String("wsHost"),
 				c.Int("wsPort"),
 			)
 
