@@ -75,6 +75,26 @@ UniBarrage 是一个帮助开发者统一处理多平台直播弹幕数据的工
 ./UniBarrage -wsHost 127.0.0.1 -wsPort 7777 -apiHost 127.0.0.1 -apiPort 8080 -useProxy
 ```
 
+```bash
+# Docker-compose 启动
+docker compose up -d
+```
+
+`docker-compose.yaml` 参考:
+
+```yaml
+version:`3`
+services:
+  unibarrage:
+    image: unibarrage:latest
+    ports:
+      - "8080:8080"
+      - "7777:7777"
+    volumes:
+      - ./data:/app/data
+    restart: always
+```
+
 ---
 
 <a id="api-list"></a>
