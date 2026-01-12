@@ -87,6 +87,7 @@ version:`3`
 services:
   unibarrage:
     image: unibarrage:latest
+    container_name: unibarrage
     ports:
       - "8080:8080"
       - "7777:7777"
