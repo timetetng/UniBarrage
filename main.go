@@ -1,13 +1,15 @@
 package main
 
 import (
+	"os"
+
 	"UniBarrage/services/api"
 	"UniBarrage/services/proxy"
 	ws "UniBarrage/services/websockets"
 	"UniBarrage/utils/cors"
 	"UniBarrage/utils/trace"
+
 	"github.com/urfave/cli/v2"
-	"os"
 )
 
 func main() {
@@ -122,6 +124,9 @@ func main() {
 					origins,
 				)
 			}
+
+			// 恢复之前保存的服务状态
+			api.RecoverService()
 
 			// 处理程序信号以进行优雅退出
 			trace.HandleSignal()

@@ -1,6 +1,16 @@
 package api
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"UniBarrage/bilibili"
 	"UniBarrage/douyin"
 	"UniBarrage/douyu"
@@ -9,18 +19,11 @@ import (
 	uni "UniBarrage/universal"
 	log "UniBarrage/utils/trace"
 	"UniBarrage/web"
-	"context"
-	"errors"
-	"fmt"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/goccy/go-json"
-	"net/http"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 // WebSocket configuration
@@ -118,6 +121,7 @@ type ServiceStatus struct {
 	Platform string        `json:"platform"`
 	RoomID   string        `json:"rid"`
 	StopChan chan struct{} `json:"-"`
+	Cookie   string        `json:"cookie,omitempty"`
 }
 
 // ServiceManager 服务管理器
@@ -126,13 +130,30 @@ type ServiceManager struct {
 	services map[string]*ServiceStatus
 }
 
+const servicesFile = "services.json" // 持久化服务配置
+
+// saveToFile 保存服务到配置文件
+func (sm *ServiceManager) saveToFile() {
+	services := make([]*ServiceStatus, 0, len(sm.services))
+	for _, status := range sm.services {
+		services = append(services, status)
+	}
+
+	data, err := json.MarshalIndent(services, "", " ")
+	if err != nil {
+		log.Printf("ERROR", "保存服务配置失败: %v", err)
+		return
+	}
+	_ = os.WriteFile(servicesFile, data, 0o644)
+}
+
 func NewServiceManager() *ServiceManager {
 	return &ServiceManager{
 		services: make(map[string]*ServiceStatus),
 	}
 }
 
-// AddService 添加服务
+// AddService 添加服务并保存
 func (sm *ServiceManager) AddService(key string, status *ServiceStatus) error {
 	sm.rwMutex.Lock()
 	defer sm.rwMutex.Unlock()
@@ -141,14 +162,16 @@ func (sm *ServiceManager) AddService(key string, status *ServiceStatus) error {
 		return fmt.Errorf("服务已存在")
 	}
 	sm.services[key] = status
+	sm.saveToFile() // 保存服务到配置文件
 	return nil
 }
 
-// RemoveService 删除服务
+// RemoveService 删除服务并保存
 func (sm *ServiceManager) RemoveService(key string) {
 	sm.rwMutex.Lock()
 	defer sm.rwMutex.Unlock()
 	delete(sm.services, key)
+	sm.saveToFile() // 保存服务到配置文件
 }
 
 // GetService 获取服务
@@ -172,6 +195,55 @@ func (sm *ServiceManager) GetAllServices() []*ServiceStatus {
 }
 
 var serviceMap = NewServiceManager()
+
+// RecoverService 从文件恢复服务
+func RecoverService() {
+	data, err := os.ReadFile(servicesFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Printf("ERROR", "读取服务配置文件失败: %v", err)
+		}
+		return
+	}
+
+	var saveServices []*ServiceStatus
+	if err := json.Unmarshal(data, &saveServices); err != nil {
+		log.Printf("ERROR", "解析服务配置文件失败: %v", err)
+		return
+	}
+
+	count := 0
+	for _, s := range saveServices {
+		stopChan := make(chan struct{})
+		var err error
+
+		// 根据平台恢复服务
+		switch uni.Platform(s.Platform) {
+		case uni.DouYin:
+			rid, _ := strconv.Atoi(s.RoomID)
+			err = startDouyinService(rid, stopChan)
+		case uni.BiliBili:
+			rid, _ := strconv.Atoi(s.RoomID)
+			err = startBilibiliService(rid, s.Cookie, stopChan)
+		case uni.KuaiShou:
+			err = startKuaishouService(s.RoomID, s.Cookie, stopChan)
+		case uni.DouYu:
+			rid, _ := strconv.Atoi(s.RoomID)
+			err = startDouYuService(rid, stopChan)
+		case uni.HuYa:
+			err = startHuYaService(s.RoomID, stopChan)
+		}
+		if err != nil {
+			log.Printf("ERROR", "恢复服务 %s/%s 失败: %v", s.Platform, s.RoomID, err)
+			close(stopChan)
+		} else {
+			count++
+		}
+	}
+	if count > 0 {
+		log.Printf("INFO", "成功恢复 %d 个监听服务", count)
+	}
+}
 
 // 生成服务唯一标识
 func generateServiceKey(platform, roomID string) string {
@@ -209,6 +281,7 @@ func startBilibiliService(BiliBiliRoom int, cookie string, stopChan chan struct{
 	status := &ServiceStatus{
 		Platform: "bilibili",
 		RoomID:   strconv.Itoa(BiliBiliRoom),
+		Cookie:   cookie,
 		StopChan: stopChan,
 	}
 
@@ -233,6 +306,7 @@ func startKuaishouService(KuaiShouRoomLink string, cookie string, stopChan chan 
 	status := &ServiceStatus{
 		Platform: "kuaishou",
 		RoomID:   KuaiShouRoomLink,
+		Cookie:   cookie,
 		StopChan: stopChan,
 	}
 
@@ -405,7 +479,7 @@ func StopService(w http.ResponseWriter, r *http.Request) {
 	serviceKey := generateServiceKey(platform, roomID)
 	if status, exists := serviceMap.GetService(serviceKey); exists {
 		close(status.StopChan)
-		//serviceMap.RemoveService(serviceKey) // 直接移除服务
+		// serviceMap.RemoveService(serviceKey) // 直接移除服务
 		jsonResponse(w, http.StatusOK, "服务已停止", map[string]string{
 			"platform": platform,
 			"rid":      roomID,
