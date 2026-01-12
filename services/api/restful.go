@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -130,7 +131,7 @@ type ServiceManager struct {
 	services map[string]*ServiceStatus
 }
 
-const servicesFile = "services.json" // 持久化服务配置
+const servicesFile = "data/services.json" // 持久化服务配置
 
 // saveToFile 保存服务到配置文件
 func (sm *ServiceManager) saveToFile() {
@@ -139,12 +140,24 @@ func (sm *ServiceManager) saveToFile() {
 		services = append(services, status)
 	}
 
+	// 确保 data 目录存在
+	dir := filepath.Dir(servicesFile)
+	if err := os.MkdirAll(dir, 0o765); err != nil {
+		log.Printf("ERROR", "创建数据目录失败: %v", err)
+		return
+	}
+
+	// 序列化
 	data, err := json.MarshalIndent(services, "", " ")
 	if err != nil {
 		log.Printf("ERROR", "保存服务配置失败: %v", err)
 		return
 	}
-	_ = os.WriteFile(servicesFile, data, 0o644)
+
+	// 写入文件
+	if err := os.WriteFile(servicesFile, data, 0o644); err != nil {
+		log.Printf("ERROR", "写入配置文件出错: %v", err)
+	}
 }
 
 func NewServiceManager() *ServiceManager {
@@ -198,6 +211,9 @@ var serviceMap = NewServiceManager()
 
 // RecoverService 从文件恢复服务
 func RecoverService() {
+	// 目录检查
+	_ = os.MkdirAll(filepath.Dir(servicesFile), 0o765)
+
 	data, err := os.ReadFile(servicesFile)
 	if err != nil {
 		if !os.IsNotExist(err) {

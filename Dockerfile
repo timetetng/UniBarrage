@@ -5,6 +5,8 @@ WORKDIR /app
 
 # 复制 go.mod 和 go.sum 并下载依赖
 COPY go.mod go.sum ./
+
+ENV GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 
 # 复制源代码
@@ -17,12 +19,18 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o UniBarrage .
 FROM alpine:latest
 
 # 安装 ca-certificates（用于 HTTPS 请求）和 bash（用于启动脚本）
-RUN apk --no-cache add ca-certificates bash
+RUN apk --no-cache add ca-certificates bash tzdata
 
 WORKDIR /app
 
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/UniBarrage .
+
+# 创建数据目录
+RUN mkdir -p data
+
+# 声明数据卷持久化
+VOLUME ["/app/data"]
 
 # 创建启动脚本，支持 AUTH_TOKEN 环境变量
 RUN echo '#!/bin/bash' > /app/start.sh && \
