@@ -2,7 +2,8 @@ version: '3'
 services:
   unibarrage:
     image: timexingjian/unibarrage:latest
-    pull_policy: never
+    # 本地构建取消注释
+    # pull_policy: never
     ports:
       - "8080:8080"
       - "7777:7777"
