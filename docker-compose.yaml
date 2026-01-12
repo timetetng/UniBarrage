@@ -1,7 +1,8 @@
 version: '3'
 services:
   unibarrage:
-    image: unibarrage:latest
+    image: timexingjian/unibarrage:latest
+    pull_policy: never
     ports:
       - "8080:8080"
       - "7777:7777"
