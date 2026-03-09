@@ -8,6 +8,8 @@ services:
     ports:
       - "8080:8080"
       - "7777:7777"
+    env_file:
+      - .env
     volumes:
       - ./data:/app/data
     restart: always

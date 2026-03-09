@@ -86,6 +86,17 @@ func main() {
 				Value:   0,
 				Usage:   "日志等级 (0: 默认, 1: 简洁, 2: 静默)",
 			},
+			// 新增：B站房间号和Cookie环境变量注入
+			&cli.IntFlag{
+				Name:    "biliRoom",
+				EnvVars: []string{"BILI_ROOM"},
+				Usage:   "Bilibili 房间号 (自动启动监听)",
+			},
+			&cli.StringFlag{
+				Name:    "biliCookie",
+				EnvVars: []string{"BILI_COOKIE"},
+				Usage:   "Bilibili Cookie",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			// 初始化 Trace
@@ -127,6 +138,13 @@ func main() {
 
 			// 恢复之前保存的服务状态
 			api.RecoverService()
+
+			// 新增：通过环境变量自动启动 Bilibili 服务
+			biliRoom := c.Int("biliRoom")
+			if biliRoom > 0 {
+				biliCookie := c.String("biliCookie")
+				api.AutoStartBilibili(biliRoom, biliCookie)
+			}
 
 			// 处理程序信号以进行优雅退出
 			trace.HandleSignal()

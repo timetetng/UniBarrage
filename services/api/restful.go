@@ -582,3 +582,22 @@ func ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(web.DashboardHTML)
 }
+
+// AutoStartBilibili 提供给 main 包调用的自动启动 Bilibili 服务的方法
+func AutoStartBilibili(roomID int, cookie string) {
+	serviceKey := generateServiceKey("bilibili", strconv.Itoa(roomID))
+	
+	// 如果由于 RecoverService 已经从文件恢复了这个房间，则跳过
+	if _, exists := serviceMap.GetService(serviceKey); exists {
+		log.Printf("INFO", "Bilibili 房间 %d 已在监听(已从持久化配置恢复)，跳过自动启动", roomID)
+		return
+	}
+	
+	stopChan := make(chan struct{})
+	err := startBilibiliService(roomID, cookie, stopChan)
+	if err != nil {
+		log.Printf("ERROR", "通过环境变量自动启动 Bilibili 监听失败: %v", err)
+	} else {
+		log.Printf("INFO", "通过环境变量自动启动 Bilibili 监听成功 (房间: %d)", roomID)
+	}
+}
